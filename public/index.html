@@ -1,0 +1,482 @@
+<!DOCTYPE html><html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Request live experiences from creators you love, back them, and unlock them together. DropLive pilot.">
+<meta name="theme-color" content="#0a0a0b"><meta name="color-scheme" content="dark">
+<meta property="og:type" content="website"><meta property="og:site_name" content="DropLive"><meta property="og:title" content="DropLive — Request & fund live experiences"><meta property="og:description" content="Ask creators for live experiences and back the ones you want.">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230a0a0b'/%3E%3Ctext x='32' y='46' font-size='40' text-anchor='middle' fill='%23c9a84c' font-family='Impact,sans-serif'%3ED%3C/text%3E%3C/svg%3E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/polish.css">
+<link rel="stylesheet" href="css/mobile.css">
+<title>DropLive — Request & fund live experiences</title>
+<script src="./config.js"></script>
+<script src="vendor/supabase.js"></script>
+</head>
+<body>
+<noscript><div class="nojs">DropLive needs JavaScript. Please enable it or try another browser.</div></noscript>
+
+<nav>
+  <div class="logo">DROP<span>LIVE</span></div>
+  <div class="tabs">
+    <button class="tab on" data-act="sw('explore',this)">Explore</button>
+    <button class="tab" data-act="sw('creators',this)">Creators</button>
+    <button class="tab" data-act="sw('request',this)">Request a Drop</button>
+    <button class="tab" data-act="sw('create',this)">Create a Drop</button>
+    <button class="tab" data-act="sw('mydrops',this)">My Activity</button>
+    <button class="tab" data-act="sw('creator',this)">Creator Dashboard</button>
+    <button class="tab" data-act="openSettingsPanel(this)">Account &amp; Settings</button>
+  </div>
+  <div style="display:flex;align-items:center;gap:8px"><button class="tab" id="bellBtn" data-act="openNotifications()" aria-label="Notifications" style="display:none;position:relative">🔔<span id="bellCount" style="display:none;background:var(--gold);color:#000;border-radius:10px;padding:0 6px;font-size:10px;margin-left:4px;font-weight:700"></span></button><button class="tab" id="authBtn" data-act="openAuth()">Sign in</button><div class="demo-pill" id="modePill">Local Prototype</div></div>
+</nav>
+
+<div id="authModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:500;align-items:center;justify-content:center;padding:20px" role="dialog" aria-modal="true" aria-label="Sign in or create account">
+  <div class="cd" style="width:min(440px,100%);max-height:92vh;overflow:auto;border-color:var(--gd)">
+    <div class="auth-tabs"><button type="button" id="authTabIn" class="on" data-act="setAuthMode('in')">Sign in</button><button type="button" id="authTabUp" data-act="setAuthMode('up')">Create account</button></div>
+    <form id="authForm" data-submit="return handleAuthSubmit(event)" novalidate>
+      <div id="authSignupFields" style="display:none">
+        <label class="cl" for="authDisplayName">Your name (shown publicly)</label>
+        <input id="authDisplayName" class="form-input" maxlength="60" autocomplete="nickname" placeholder="e.g. Fitness Dash" style="margin-bottom:10px">
+        <div class="cl">I’m joining as</div>
+        <div class="role-pick">
+          <label><input type="radio" name="authRoleR" value="fan" checked><span><strong>Fan</strong>Discover, follow, request and back experiences</span></label>
+          <label><input type="radio" name="authRoleR" value="creator"><span><strong>Creator</strong>Publish Drops and receive fan requests</span></label>
+          <label><input type="radio" name="authRoleR" value="both"><span><strong>Both</strong>Fan and creator features</span></label>
+        </div>
+        <div class="request-note" style="margin:8px 0 10px">You can change this any time in Account &amp; Settings.</div>
+        <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;margin-bottom:12px"><input type="checkbox" id="authAgree" style="margin-top:2px"><span>I agree to the <a href="#" data-act="openLegal();return false" style="color:var(--gold)">Terms &amp; Privacy</a> (version 2026-10-16).</span></label>
+      </div>
+      <label class="cl" for="authEmail">Email</label>
+      <input id="authEmail" class="form-input" type="email" autocomplete="email" inputmode="email" placeholder="you@example.com" style="margin-bottom:10px">
+      <label class="cl" for="authPassword">Password</label>
+      <div style="position:relative;margin-bottom:12px"><input id="authPassword" class="form-input" type="password" autocomplete="current-password" placeholder="Password" style="padding-right:64px"><button type="button" id="pwToggle" class="linklike" style="position:absolute;right:10px;top:50%;transform:translateY(-50%)" data-act="togglePassword()">Show</button></div>
+      <button type="submit" id="authSubmit" class="dc-cta" style="margin:0;width:100%">SIGN IN</button>
+      <div style="display:flex;justify-content:space-between;gap:10px;margin-top:10px"><button type="button" class="linklike" id="forgotBtn" data-act="forgotPassword()">Forgot password?</button><button type="button" class="linklike" id="resendBtn" style="display:none" data-act="resendConfirmation()">Resend confirmation email</button></div>
+    </form>
+    <div id="authMsg" class="prototype-note" style="margin-top:10px;display:none" role="alert"></div>
+    <button type="button" class="tab" style="margin-top:12px" data-act="closeAuth()">Close</button>
+  </div>
+</div>
+
+<div id="notifModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:500;align-items:flex-start;justify-content:center;padding:70px 16px 20px" data-act="if(event.target===this)closeNotifications()">
+  <div class="cd" style="width:min(460px,100%);max-height:80vh;overflow:auto;border-color:var(--gd)">
+    <div class="sh"><span class="sn">INBOX</span><span class="st">Notifications</span></div>
+    <div id="notifList"></div>
+    <div style="display:flex;gap:8px;margin-top:12px"><button class="tab" data-act="markAllNotificationsRead()">Mark all read</button><button class="tab" data-act="closeNotifications()">Close</button></div>
+  </div>
+</div>
+<div id="accountModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:500;align-items:center;justify-content:center;padding:20px">
+  <div class="cd" style="width:min(420px,100%);border-color:var(--gd)">
+    <div class="sh"><span class="sn">ACCOUNT</span><span class="st">DropLive account</span></div>
+    <p class="cb" style="margin-bottom:6px">Signed in as</p>
+    <div id="accountEmail" style="font-weight:700;margin-bottom:18px;word-break:break-word"></div>
+    <div style="display:grid;gap:8px">
+      <button class="dc-cta" data-act="startCreateDropFromAccount()">CREATE A DROP</button>
+      <button class="tab" data-act="openMyActivityFromAccount()">MY ACTIVITY</button>
+      <button class="tab" data-act="openRequestFromAccount()">REQUEST A DROP</button>
+      <button class="tab" data-act="openCreatorDemandFromAccount()">CREATOR DEMAND</button>
+      <button class="dc-cta" style="background:var(--s3);color:var(--tx)" data-act="openSettingsFromAccount()">ACCOUNT &amp; SETTINGS</button>
+      <button class="tab" data-act="closeAccount()">Close</button>
+      <button class="tab" data-act="signOut()">Sign out</button>
+    </div>
+    <div id="accountMsg" class="prototype-note" style="margin-top:10px;display:none"></div>
+  </div>
+</div>
+
+<!-- ═══════════════ ACCOUNT & SETTINGS ═══════════════ -->
+<div id="p-settings" class="pn">
+  <div class="market-hero">
+    <div class="hk">YOUR DROP LIVE ACCOUNT</div>
+    <div class="ht" style="font-size:clamp(38px,6vw,62px)">ACCOUNT <span>&amp; SETTINGS</span></div>
+    <div class="hs">Manage your profile, account security and preferences. One account can support Drops and create them.</div>
+  </div>
+  <div class="sec">
+    <div class="sh"><span class="sn">01</span><span class="st">Public Profile</span></div>
+    <div class="cd" style="max-width:760px">
+      <div class="g2">
+        <div><label class="cl" for="settingsUsername">Username (unique)</label><input id="settingsUsername" class="form-input" maxlength="20" placeholder="e.g. fitnessdash (letters, numbers, _)"></div>
+        <div><label class="cl" for="settingsDisplayName">Display name</label><input id="settingsDisplayName" class="form-input" maxlength="60" placeholder="How your name appears"></div>
+        <div><label class="cl" for="settingsRole">Account mode</label><select id="settingsRole" class="form-input"><option value="fan">Fan</option><option value="creator">Creator</option><option value="both">Both</option></select></div>
+        <div style="grid-column:1/-1"><label class="cl" for="settingsAvatarUrl">Profile photo URL (optional)</label><input id="settingsAvatarUrl" class="form-input" type="url" placeholder="https://..."></div>
+      </div>
+      <p class="cb" style="margin-top:10px">Your display name and account mode are saved to your DropLive profile. Choose Creator or Both to appear in Creator Discovery. Profile photos are stored as a URL for now; image uploads will come later.</p>
+      <button class="dc-cta" style="margin-top:14px" data-act="saveAccountProfile()">SAVE PROFILE</button>
+      <div id="settingsProfileMsg" class="prototype-note" style="display:none;margin-top:10px"></div>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="sh"><span class="sn">02</span><span class="st">Account & Security</span></div>
+    <div class="g2" style="max-width:900px">
+      <div class="cd">
+        <div class="ct">Email address</div><p id="settingsCurrentEmail" class="cb" style="margin-bottom:12px">Sign in to manage your account email.</p>
+        <label class="cl" for="settingsNewEmail">Change email</label><input id="settingsNewEmail" class="form-input" type="email" autocomplete="email" placeholder="New email address">
+        <button class="dc-cta" style="margin-top:10px" data-act="changeAccountEmail()">UPDATE EMAIL</button>
+        <p class="cb" style="margin-top:8px">Supabase may ask you to confirm the new address by email.</p>
+      </div>
+      <div class="cd">
+        <div class="ct">Password</div><p class="cb" style="margin-bottom:12px">Use a strong password you do not use elsewhere.</p>
+        <label class="cl" for="settingsNewPassword">New password</label><input id="settingsNewPassword" class="form-input" type="password" minlength="8" autocomplete="new-password" placeholder="At least 8 characters">
+        <button class="dc-cta" style="margin-top:10px" data-act="changeAccountPassword()">UPDATE PASSWORD</button>
+      </div>
+    </div>
+    <div id="settingsSecurityMsg" class="prototype-note" style="display:none;margin-top:12px;max-width:900px"></div>
+    <div class="cd" style="max-width:900px;margin-top:12px"><div class="ct">Sign out</div><p class="cb" style="margin-bottom:10px">Sign out of this device when you're finished.</p><button class="tab" style="border:1px solid #38383f" data-act="signOut()">SIGN OUT</button><p class="cb" style="margin-top:10px">For account deletion, contact DropLive support for now. Deletion must be handled securely on the server.</p></div>
+  </div>
+  
+  <div class="sec">
+    <div class="sh"><span class="sn">03</span><span class="st">Creator Settings</span></div>
+    <div class="cd" style="max-width:900px"><div class="ct">Creator profile</div><p class="cb">Your public creator name uses the Display name above. Creator payouts and payment details are intentionally not available until secure payment infrastructure is implemented. Fans can use DropLive without becoming creators.</p><button class="tab" style="border:1px solid #38383f;margin-top:12px" data-act="openCreatorFromSettings()">OPEN CREATOR DASHBOARD</button></div>
+  </div>
+</div>
+
+<!-- ═══════════════ EXPLORE ═══════════════ -->
+<div id="p-profile" class="pn"><div class="sec" style="max-width:900px">
+  <a href="#" class="linklike" data-act="leaveProfile();return false" style="display:inline-block;margin-bottom:14px">← Back to DropLive</a>
+  <div id="profileBox"><div class="market-empty">Loading creator…</div></div>
+</div></div>
+<div id="p-legal" class="pn"><div class="sec" style="max-width:760px">
+  <div class="sh"><span class="sn">LEGAL</span><span class="st">Terms &amp; Privacy</span></div>
+  <div class="request-note" style="margin-bottom:14px">Version 2026-10-16. Highlighted items are filled in before launch.</div>
+  <div class="cd"><div class="ct">Terms of Service — who we are</div><p class="cb" style="margin-bottom:6px">DropLive is operated by <mark style="background:#f5c84233;color:inherit">[COMPANY NAME, RC NUMBER]</mark>, <mark style="background:#f5c84233;color:inherit">[REGISTERED ADDRESS]</mark> (“DropLive”, “we”). Contact: <mark class="support-email" style="background:#f5c84233;color:inherit">[SUPPORT EMAIL]</mark>. By creating an account or using DropLive you agree to these Terms and the Privacy Policy below. You must be 18 or older.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">What DropLive is</div><p class="cb" style="margin-bottom:6px">DropLive is a marketplace that lets fans request live experiences from creators and fund them together. We provide the platform; <strong>creators, not DropLive, are responsible for delivering what they offer</strong>. A <em>request</em> is a free signal of interest. A <em>Drop</em> is a scheduled experience with a funding goal and deadline.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">Contributions, fees and refunds</div><p class="cb" style="margin-bottom:6px"><span id="aboutNote">DropLive is in a pilot. <strong>No real payments are processed yet.</strong> A pledge is a recorded intention and no money moves through the app. Any payment arrangement during the pilot will be explained to you in writing before you pay.</span></p><p class="cb" style="margin-bottom:6px">When payments are live: contributions are processed by Paystack. Funding is all-or-nothing: if a Drop does not reach its goal by its deadline, or the creator cancels it, you are refunded in full to your original payment method within <mark style="background:#f5c84233;color:inherit">[X]</mark> business days. A platform fee of <mark style="background:#f5c84233;color:inherit">[FEE %]</mark> is deducted from creator proceeds, not added to what fans pay. If a funded Drop is not delivered, contact us within <mark style="background:#f5c84233;color:inherit">[7]</mark> days of the scheduled time and we will review it and may refund you. Pledges after a deadline are not accepted.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">Accounts and conduct</div><p class="cb" style="margin-bottom:6px">Use your real identity and keep your login secure. You may not impersonate others, post unlawful, hateful, sexual, fraudulent or misleading content, harass people, record a session without the permission of everyone in it, or abuse the request, report or rating tools. Verified badges are assigned manually. We may remove content, suspend accounts or cancel Drops that breach these Terms or put people at risk, and we may refund affected fans.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">Creator terms</div><p class="cb" style="margin-bottom:6px">Creators act as independent businesses, not employees or agents of DropLive. You must own or have the right to everything you offer, deliver what you list at the scheduled time, set truthful titles and descriptions, and handle your own taxes. We may require identity and bank verification (KYC) before paying out. Payouts are made after a Drop is completed, less fees and any refunds, on a schedule we will publish. You agree to compensate DropLive for losses caused by your breach of these Terms or by claims over your content.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">Your content</div><p class="cb" style="margin-bottom:6px">You keep ownership of what you post (requests, questions, profile information, Drops). You give DropLive a non-exclusive, worldwide licence to host and display it to run the service. You confirm it does not infringe anyone’s rights. Use the Report button to flag content; we review reports and may act on them.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">Liability and disputes</div><p class="cb" style="margin-bottom:6px">The service is provided “as is”. To the extent permitted by law, DropLive is not liable for a creator’s conduct, a session link or third-party service failing, or indirect losses; our total liability for any claim is limited to the amount you paid us in the 12 months before it arose. Nothing here limits rights you have under Nigerian consumer law or liability that cannot lawfully be excluded. These Terms are governed by the laws of the Federal Republic of Nigeria; disputes go first to good-faith discussion, then to the courts of <mark style="background:#f5c84233;color:inherit">[LAGOS STATE / ARBITRATION]</mark>. We may update these Terms and will tell you about material changes; continuing to use DropLive means you accept them.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">Privacy Policy — who is responsible</div><p class="cb" style="margin-bottom:6px"><mark style="background:#f5c84233;color:inherit">[COMPANY NAME, RC NUMBER]</mark> is the data controller. Data protection contact: <mark class="support-email" style="background:#f5c84233;color:inherit">[SUPPORT EMAIL]</mark>. We process personal data under the Nigeria Data Protection Act 2023 (NDPA) and related regulations.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">What we collect and why</div><p class="cb" style="margin-bottom:6px"><strong>Account:</strong> email, display name, @username, role, optional photo link, login and device data (to create and secure your account). <strong>Activity:</strong> requests, pledges and contributions, follows, notifications, questions, ratings and reports (to run the marketplace and keep it safe). <strong>Payments:</strong> payment status and reference from Paystack; we do not store your card details. <strong>Technical:</strong> IP address and request logs used for security, rate-limiting and fraud prevention. Legal bases: performing our contract with you, our legitimate interests in security and service improvement, legal obligations, and your consent where we ask for it.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">Who can see it</div><p class="cb" style="margin-bottom:6px">Your display name, @username, photo and public Drops are visible to others. Your email and individual pledges are private to you; creators see counts and totals for their own Drops. We do not sell personal data.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">Service providers and transfers</div><p class="cb" style="margin-bottom:6px">We use Supabase (database, authentication, hosting), Paystack (payments), an email delivery provider <mark style="background:#f5c84233;color:inherit">[E.G. RESEND]</mark> and our web host. Some of these process data outside Nigeria; we rely on appropriate safeguards required by the NDPA and contractual protections. We may disclose data to authorities where the law requires.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">Retention and security</div><p class="cb" style="margin-bottom:6px">We keep account data while your account is active and delete or anonymise it within <mark style="background:#f5c84233;color:inherit">[30]</mark> days of a verified deletion request, except records we must keep for tax, accounting, fraud or dispute purposes (for example payment records for <mark style="background:#f5c84233;color:inherit">[6]</mark> years). We use access controls, encryption in transit and database-level security rules. If a breach puts your rights at risk we will notify you and the Nigeria Data Protection Commission (NDPC) as the law requires.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">Your rights, cookies and children</div><p class="cb" style="margin-bottom:6px">You may request access, correction, deletion, restriction, portability, or object to processing, and withdraw consent, by emailing <mark class="support-email" style="background:#f5c84233;color:inherit">[SUPPORT EMAIL]</mark>; we aim to respond within 30 days. You may complain to the NDPC. We use browser storage only to keep you signed in and remember basic settings, not for advertising. DropLive is not for anyone under 18 and we delete data we learn belongs to a child.</p></div>
+  <div class="cd" style="margin-top:10px"><div class="ct">Version</div><p class="cb" style="margin-bottom:6px">Version 2026-10-16. Questions or deletion requests: <mark class="support-email" style="background:#f5c84233;color:inherit">[SUPPORT EMAIL]</mark><span id="legalContact"></span>.</p></div>
+</div></div>
+<div id="p-explore" class="pn on">
+  <div id="inviteBanner" class="cd" style="display:none;margin:12px auto;max-width:900px"></div>
+  <div class="market-hero">
+    <div class="hk">DISCOVER EXPERIENCES</div>
+    <div class="ht" style="font-size:clamp(42px,7vw,68px)">FIND YOUR <span>DROP.</span></div>
+    <div class="hs">Browse live experiences people want to unlock. Join a Drop that interests you, or request one from a creator.</div>
+    <div style="display:flex;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:1.2rem">
+      <button class="dc-cta" style="margin:0;width:auto;min-width:220px;padding:14px 32px" data-act="scrollToDrops()">EXPLORE DROPS</button>
+      <button class="dc-cta" style="margin:0;width:auto;min-width:220px;padding:14px 32px;background:var(--s3);color:var(--tx)" data-act="openRequestFromNav()">REQUEST A DROP</button>
+      <button class="dc-cta" id="heroCreatorBtn" style="margin:0;width:auto;min-width:220px;padding:14px 32px;background:transparent;color:var(--gold);border:1px solid var(--gold)" data-act="creatorCta()">I'M A CREATOR</button>
+    </div>
+  </div>
+  <div class="sec" id="exploreSection">
+    <div class="sh"><span class="sn">01</span><span class="st">Explore Drops</span></div>
+    <div class="filter-row">
+      <button class="filter-chip on" data-filter="all" data-act="filterExplore('all',this)">All</button>
+      <button class="filter-chip" data-filter="music" data-act="filterExplore('music',this)">Music</button>
+      <button class="filter-chip" data-filter="entertainment" data-act="filterExplore('entertainment',this)">Entertainment</button>
+      <button class="filter-chip" data-filter="business" data-act="filterExplore('business',this)">Business</button>
+      <button class="filter-chip" data-filter="faith" data-act="filterExplore('faith',this)">Faith</button>
+      <button class="filter-chip" data-filter="lifestyle" data-act="filterExplore('lifestyle',this)">Lifestyle</button>
+    </div>
+    <div class="filter-row explore-tools">
+      <input id="exploreSearch" type="search" class="form-input" placeholder="Search Drops or creators" autocomplete="off" data-input="setExploreSearch(this)">
+      <select id="exploreSort" class="form-input" data-input="setExploreSort(this)">
+        <option value="new">Newest</option><option value="funded">Most funded</option><option value="close">Closest to goal</option><option value="ending">Ending soon</option>
+      </select>
+    </div>
+    <div id="exploreGrid" class="market-grid"></div>
+  </div>
+  <div class="sec">
+    <div class="cd" style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap">
+      <div><div class="bge bg-g">CAN'T FIND IT?</div><div class="ct">Ask for the experience you want.</div><div class="cb">Request a Drop from a creator. Your request is demand data — it is not a payment or a promise that the creator has agreed yet.</div></div>
+      <button class="dc-cta" style="margin:0;white-space:nowrap" data-act="openRequestFromNav()">REQUEST A DROP</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CREATOR DISCOVERY ═══════════════ -->
+<div id="p-creators" class="pn">
+  <div class="market-hero">
+    <div class="hk">THE PEOPLE BEHIND THE DROPS</div>
+    <div class="ht" style="font-size:clamp(38px,6vw,62px)">FIND YOUR <span>CREATORS.</span></div>
+    <div class="hs">Discover registered DropLive creators, explore their Drops, and follow the people whose experiences you want to unlock.</div>
+  </div>
+  <div class="sec">
+    <div class="sh"><span class="sn">01</span><span class="st">Search creators</span></div>
+    <input id="creatorSearch" class="form-input" type="search" placeholder="Search by name or @username…" data-input="filterCreatorDirectory()" style="max-width:520px;margin-bottom:14px">
+    <div class="ct" style="margin:6px 0 10px">Open requests you can back</div><div id="demandBoard" class="market-grid" style="margin-bottom:22px"></div>
+    <div id="creatorDirectoryStatus" class="request-note" style="margin-bottom:12px">Loading registered creators…</div>
+    <div id="creatorDirectory" class="market-grid"></div>
+    <div class="cd" style="margin-top:22px"><div class="bge bg-g">NOT HERE YET?</div><div class="ct">Invite a creator you want on DropLive.</div><div class="cb" style="margin-bottom:10px">Creators only see requests once they join. Send them an invite — the more fans who ask, the more likely they say yes.</div>
+      <input id="inviteName" class="form-input" maxlength="60" placeholder="Creator name, e.g. Fitness Dash" style="max-width:420px;margin-bottom:10px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap"><button class="tab" data-act="inviteShare('wa','inviteName')">Invite on WhatsApp</button><button class="tab" data-act="inviteShare('copy','inviteName')">Copy invite</button></div></div>
+  </div>
+</div>
+
+<!-- ═══════════════ PRODUCT ═══════════════ -->
+<div id="p-product" class="pn">
+  
+
+  <div class="sec" id="publicDropSection">
+    <div class="sh"><span class="sn">01</span><span class="st" id="publicDropHeading">The Drop</span></div>
+    <div class="drop-card">
+      <div class="dc-artist">
+        <div class="dc-av">BB</div>
+        <div>
+          <div class="dc-name">Test Creator</div>
+          <div class="dc-meta">Demo host · Music</div>
+        </div>
+        <div class="live-pill">DROP LIVE</div>
+      </div>
+      <div class="dc-countdown">
+        <div class="cd-unit"><div class="cd-num" id="cdH">11</div><div class="cd-lbl">Hours</div></div>
+        <div class="cd-sep">:</div>
+        <div class="cd-unit"><div class="cd-num" id="cdM">47</div><div class="cd-lbl">Mins</div></div>
+        <div class="cd-sep">:</div>
+        <div class="cd-unit"><div class="cd-num" id="cdS">33</div><div class="cd-lbl">Secs</div></div>
+      </div>
+      <div class="dc-topic">
+        <div class="dc-tl">Drop Topic</div>
+        <div class="dc-tt">"Private live Q&amp;A — test Drop"</div>
+      </div>
+      <div class="dc-description" id="dropDescriptionPublic">A private experience for supporters.</div>
+      <div class="dc-contribution">
+        <div class="dc-contribution-row">
+          <div><div class="dc-contribution-label">Contribution to join</div><div class="public-drop-note">Test mode · no real payment has been made</div></div>
+          <div class="dc-contribution-value" id="publicContribution">₦1,000</div>
+        </div>
+      </div>
+      <div class="dc-progress">
+        <div class="dc-pm">
+          <div class="dc-raised" id="raised">₦0</div>
+          <div class="dc-goal">of ₦100,000 goal</div>
+        </div>
+        <div class="dc-track"><div class="dc-fill" id="fill" style="width:0%"></div></div>
+        <div class="dc-slots">
+          <span id="pcount">0 fans contributed</span>
+          <span class="urgent" id="sleft">₦100,000 to unlock</span>
+        </div>
+      </div>
+      
+      <button class="dc-cta" id="cta" data-act="pledge()">CONTRIBUTE ₦1,000 · UNLOCK THE DROP</button>
+      <div class="request-note" id="payNote" style="margin-top:10px">Payments are not live yet: a pledge is saved as <strong>pending</strong> and no money is taken. Planned rule for launch: you are only charged if the goal is met by the deadline, otherwise you are refunded.</div>
+      <div id="deliveryCard" class="cd" style="display:none;margin:12px 0"></div>
+      <div id="liveRoom" class="cd" style="display:none;margin:12px 0"></div>
+<div class="share-row"><button class="tab" data-act="shareDrop('wa')">Share on WhatsApp</button><button class="tab" data-act="shareDrop('copy')" id="copyLinkBtn">Copy link</button><button class="tab" data-act="shareDrop('native')">More…</button><button class="tab" data-act="openReport('drop')">Report</button></div>
+      <div class="dc-foot">
+        <div class="dc-trust" id="trustLine">Funding deadline countdown above · Real payments are not connected yet</div>
+        <div class="dc-pledgers" id="lc">0 in</div>
+      </div>
+    </div>
+  </div>
+
+  
+
+  
+</div>
+
+<!-- ═══════════════ REQUEST A DROP ═══════════════ -->
+<div id="p-request" class="pn">
+  <div class="market-hero">
+    <div class="hk">FAN DEMAND</div>
+    <div class="ht" style="font-size:clamp(42px,7vw,68px)">REQUEST A <span>DROP.</span></div>
+    <div class="hs">Tell us what you want to experience. A request does not charge you; it helps creators see real demand before deciding whether to create a Drop.</div>
+  </div>
+  <div class="sec">
+    <div class="cd" style="max-width:700px;margin:0 auto">
+      <form id="requestDropForm">
+        <label class="cl" style="display:block">Creator you want</label>
+        <input id="requestCreator" required list="creatorOptions" autocomplete="off" placeholder="Search a registered creator or type a name" class="form-input"><datalist id="creatorOptions"></datalist>
+        <input type="hidden" id="requestCreatorId" value="">
+        <div class="request-note" style="margin:6px 0 10px">Pick a registered creator from the suggestions so they receive your request. Anyone else is saved to your account only.</div>
+        <label class="cl" style="display:block;margin-top:1rem">What experience do you want?</label>
+        <input id="requestTitle" required placeholder="Private live Q&A" class="form-input">
+        <label class="cl" style="display:block;margin-top:1rem">Tell the creator what you want</label>
+        <textarea id="requestDescription" required placeholder="What should the live experience be about?" class="form-input" style="min-height:110px;resize:vertical"></textarea>
+        <div class="request-grid" style="margin-top:1rem">
+          <div><label class="cl" style="display:block">I'd be willing to contribute (₦)</label><input id="requestAmount" required type="number" min="100" step="100" value="5000" class="form-input"></div>
+          <div><label class="cl" style="display:block">How many people might join?</label><input id="requestPeople" required type="number" min="1" step="1" value="20" class="form-input"></div>
+        </div>
+        <div class="prototype-note" style="margin-top:10px">This is a demand signal only. No money is taken when you submit a request.</div>
+        <button class="dc-cta" type="submit" style="width:100%;margin-top:1.2rem">SEND REQUEST</button>
+      </form>
+      <div id="requestResult" style="display:none;margin-top:1rem"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CREATOR DEMAND ═══════════════ -->
+<div id="p-demand" class="pn">
+  <div class="market-hero">
+    <div class="hk">CREATOR INBOX</div>
+    <div class="ht" style="font-size:clamp(42px,7vw,68px)">FANS WANT <span>THIS.</span></div>
+    <div class="hs">See fan requests matched to your creator profile. Turn real demand into a Drop when you are ready. Requests are demand signals only — no money has been collected.</div>
+  </div>
+  <div class="sec">
+    <div class="cd" style="max-width:820px;margin:0 auto">
+      <div class="sh"><span class="sn">01</span><span class="st">Incoming Requests</span></div>
+      <div id="creatorDemandSummary" class="prototype-note" style="margin-bottom:12px">Sign in as a creator to see requests addressed to you.</div>
+      <div id="creatorDemandList" class="demand-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ CREATE DROP ═══════════════ -->
+<div id="p-create" class="pn">
+  <div class="hero" style="padding-bottom:2rem">
+    <div class="hk">Creator Studio</div>
+    <div class="ht" style="font-size:clamp(44px,8vw,72px)">CREATE A <span>DROP.</span></div>
+    <div class="hs">Turn a specific fan request into a funded live experience. Create a real Drop tied to your authenticated DropLive account. For this MVP, creation is database-backed; payments and live video are not connected yet.</div>
+  </div>
+  <div class="sec">
+    <div class="cd" style="max-width:620px;margin:0 auto">
+      <form id="createDropForm">
+        <label class="cl" style="display:block">Creator name</label>
+        <input id="creatorName" required value="Test Creator" class="form-input">
+        <label class="cl" style="display:block;margin-top:1rem">Drop title</label>
+        <input id="dropTitle" required placeholder="Private live Q&A with me" class="form-input">
+        <label class="cl" style="display:block;margin-top:1rem">Category</label>
+        <select id="dropCategory" class="form-input">
+          <option value="music">Music</option><option value="entertainment">Entertainment</option><option value="business">Business</option><option value="faith">Faith</option><option value="lifestyle">Lifestyle</option><option value="other" selected>Other</option>
+        </select>
+        <label class="cl" style="display:block;margin-top:1rem">What will fans unlock?</label>
+        <textarea id="dropDescription" required placeholder="60-minute private live Q&A for supporters." class="form-input" style="min-height:100px;resize:vertical"></textarea>
+        <div class="g2" style="margin-top:1rem">
+          <div><label class="cl" style="display:block">Funding goal (₦)</label><input id="dropGoal" required type="number" min="1000" step="1000" value="100000" class="form-input"></div>
+          <div><label class="cl" style="display:block">Contribution (₦)</label><input id="dropContribution" required type="number" min="100" step="100" value="1000" class="form-input"></div>
+        </div>
+        <div class="g2" style="margin-top:1rem">
+          <div><label class="cl" style="display:block">Live date</label><input id="dropDate" required type="date" class="form-input"></div>
+          <div><label class="cl" style="display:block">Live time</label><input id="dropTime" required type="time" value="20:00" class="form-input"></div>
+        </div>
+        <div style="margin-top:1rem">
+          <label class="cl" style="display:block">Funding deadline</label>
+          <input id="dropDeadline" required type="datetime-local" class="form-input">
+          <div class="prototype-note" style="margin-top:6px">The funding deadline must be before the live session.</div>
+        </div>
+        <button class="dc-cta" type="submit" style="margin-left:0;width:100%;margin-right:0;margin-top:1.2rem">CREATE DROP</button>
+      </form>
+      <div id="createResult" style="display:none;margin-top:1rem"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MY ACTIVITY ═══════════════ -->
+<div id="p-mydrops" class="pn">
+  <div class="market-hero">
+    <div class="hk">YOUR DROPLIVE ACTIVITY</div>
+    <div class="ht" style="font-size:clamp(42px,7vw,68px)">MY <span>ACTIVITY.</span></div>
+    <div class="hs">See Drops you created, requests you sent, and experiences you've joined.</div>
+  </div>
+  <div class="sec">
+    <div class="activity-stack" style="max-width:1100px;margin:0 auto">
+      <div class="cd"><div class="sh"><span class="sn">01</span><span class="st">My Drops</span></div><div id="myDropsList" class="activity-list"></div></div>
+      <div class="cd"><div class="sh"><span class="sn">02</span><span class="st">My Requests</span></div><div id="myRequestsList" class="activity-list"></div></div>
+      <div class="cd"><div class="sh"><span class="sn">03</span><span class="st">Drops I Support</span></div><div id="mySupportedDropsList" class="activity-list"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ WALLET ═══════════════ -->
+
+
+<!-- ═══════════════ SPOTLIGHT ═══════════════ -->
+
+
+<!-- ═══════════════ CREATOR DASHBOARD ═══════════════ -->
+<div id="p-creator" class="pn">
+  <div class="market-hero">
+    <div class="hk">CREATOR STUDIO · PERFORMANCE</div>
+    <div class="ht" style="font-size:clamp(42px,7vw,68px)">YOUR CREATOR <span>DASHBOARD.</span></div>
+    <div class="hs">A live view of your Drops, verified contributions, pending support records and fan demand. Pending contributions and estimated demand are never counted as money earned.</div>
+  </div>
+  <div class="sec">
+    <div style="max-width:1100px;margin:0 auto">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px;flex-wrap:wrap">
+        <div><div class="hk">OVERVIEW</div><div id="creatorDashboardGreeting" style="font-size:18px;font-weight:700">Your creator activity</div></div>
+        <button class="dc-cta" type="button" data-act="renderCreatorDashboard()">REFRESH DATA</button>
+      </div>
+      <div id="creatorChecklist" class="cd" style="display:none;margin-bottom:14px"></div>
+      <div id="creatorDashboardNotice" class="prototype-note" style="margin-bottom:14px">Sign in to load your creator data.</div>
+      <div class="dash-grid creator-live-stats">
+        <div class="dash-stat"><div class="dash-val" id="creatorPaidTotal">₦0</div><div class="dash-lbl">Verified contributions</div></div>
+        <div class="dash-stat"><div class="dash-val" id="creatorPendingTotal">₦0</div><div class="dash-lbl">Pending · not paid</div></div>
+        <div class="dash-stat"><div class="dash-val" id="creatorDropCount">0</div><div class="dash-lbl">My Drops</div></div>
+        <div class="dash-stat"><div class="dash-val" id="creatorSupporterCount">0</div><div class="dash-lbl">Verified supporters</div></div>
+        <div class="dash-stat"><div class="dash-val" id="creatorOpenDemand">0</div><div class="dash-lbl">Open requests</div></div>
+        <div class="dash-stat"><div class="dash-val" id="creatorEstimatedDemand">₦0</div><div class="dash-lbl">Estimated demand · not money</div></div>
+      </div>
+      <div class="sh" style="margin-top:1.7rem"><span class="sn">01</span><span class="st">My Drops</span></div>
+      <div id="creatorDashboardDrops" class="demand-list"><div class="market-empty">Sign in to load your Drops.</div></div>
+      <div id="pilotPledges" style="margin:14px 0"></div>
+      <div class="sh" style="margin-top:1.7rem"><span class="sn">02</span><span class="st">Demand Inbox</span></div>
+      <div id="creatorDashboardDemand" class="demand-list"><div class="market-empty">Sign in to load requests addressed to your creator profile.</div></div>
+      <div class="sh" style="margin-top:1.7rem"><span class="sn">03</span><span class="st">Earnings</span></div>
+      <div id="creatorEarnings" class="demand-list"><div class="market-empty">Sign in to see your earnings.</div></div>
+      <div class="cd how-panel">
+        <div class="sh"><span class="sn">03</span><span class="st">How these numbers work</span></div>
+        <dl class="how-list">
+          <div class="how-row"><dt>Verified contributions</dt><dd>Only contributions with a verified <strong>paid</strong> status count. This prototype does not yet process real payments.</dd></div>
+          <div class="how-row"><dt>Pending support</dt><dd>Fan intent only. Not earnings, available balance or money received.</dd></div>
+          <div class="how-row"><dt>Estimated demand</dt><dd>Willingness × potential supporters from requests. A rough estimate, not committed funding.</dd></div>
+          <div class="how-row"><dt>Analytics</dt><dd>Views, conversion, repeat supporters and time-to-goal will arrive with reliable event tracking.</dd></div>
+        </dl>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════ MODEL ═══════════════ -->
+
+
+<!-- ═══════════════ RISKS ═══════════════ -->
+
+
+<!-- ═══════════════ PITCH ═══════════════ -->
+
+
+<!-- ═══════════════ VISION ═══════════════ -->
+
+
+<script src="js/core/utils.js" defer></script>
+<script src="js/ui/actions.js" defer></script>
+<script src="js/core/boot.js" defer></script>
+<script src="js/features/delivery-invite.js" defer></script>
+<script src="js/ui/panels.js" defer></script>
+<script src="js/core/data.js" defer></script>
+<script src="js/features/creator-profile.js" defer></script>
+<script src="js/features/pledge.js" defer></script>
+<script src="js/features/explore.js" defer></script>
+<script src="js/features/drop-edit.js" defer></script>
+<script src="js/features/requests-dashboard.js" defer></script>
+<script src="js/features/lifecycle.js" defer></script>
+<script src="js/features/earnings.js" defer></script>
+<script src="js/features/live-room.js" defer></script>
+<script src="js/features/account-auth.js" defer></script>
+<script src="js/features/bootstrap.js" defer></script>
+
+<!-- ═══════════════ THE ASK ═══════════════ -->
+
+
+
+
+
+<div id="reportModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:500;align-items:center;justify-content:center;padding:20px" role="dialog" aria-modal="true" aria-label="Report"><div class="cd" style="width:min(420px,100%)">
+  <div class="ct">Report this</div><div class="cb" style="margin-bottom:10px">Tell us what is wrong. Reports are private and reviewed by the DropLive team.</div>
+  <label class="cl" for="reportCategory">Reason</label><select id="reportCategory" class="form-input" style="margin-bottom:8px"><option>Scam or fraud</option><option>Impersonation</option><option>Abuse or harassment</option><option>Inappropriate content</option><option>Other</option></select>
+  <label class="cl" for="reportDetails">Details (optional)</label><textarea id="reportDetails" class="form-input" rows="3" maxlength="400" style="margin-bottom:8px"></textarea>
+  <div id="reportMsg" class="prototype-note" style="display:none;margin-bottom:8px" role="alert"></div>
+  <div style="display:flex;gap:8px"><button class="dc-cta" style="flex:1;margin:0" data-act="submitReport()">SEND REPORT</button><button class="tab" data-act="closeReport()">Cancel</button></div></div></div>
+<div id="editDropModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:500;align-items:center;justify-content:center;padding:20px" role="dialog" aria-modal="true" aria-label="Edit Drop"><div class="cd" style="width:min(460px,100%);max-height:92vh;overflow:auto">
+  <div class="ct">Edit Drop</div>
+  <label class="cl" for="editTitle">Title</label><input id="editTitle" class="form-input" maxlength="120" style="margin-bottom:8px">
+  <label class="cl" for="editDescription">Description</label><textarea id="editDescription" class="form-input" rows="4" style="margin-bottom:8px"></textarea>
+  <label class="cl" for="editLive">Live date &amp; time</label><input id="editLive" type="datetime-local" class="form-input" style="margin-bottom:8px">
+  <label class="cl" for="editDeadline">Funding deadline</label><input id="editDeadline" type="datetime-local" class="form-input" style="margin-bottom:8px">
+  <label class="cl" for="editSessionUrl">Session link (https, shown only to confirmed backers)</label><input id="editSessionUrl" class="form-input" type="url" placeholder="https://meet.google.com/… or Zoom / Instagram Live" style="margin-bottom:8px">
+  <label class="cl" for="editSessionNotes">Instructions for backers</label><textarea id="editSessionNotes" class="form-input" rows="3" maxlength="1000" style="margin-bottom:8px"></textarea>
+  <div class="request-note" style="margin-bottom:10px">The goal and contribution amount can’t be changed here, so fans always know what they pledged to.</div>
+  <div style="display:flex;gap:8px"><button class="dc-cta" style="flex:1;margin:0" data-act="saveEditDrop()">SAVE CHANGES</button><button class="tab" data-act="closeEditDrop()">Cancel</button></div>
+  <div id="editMsg" class="prototype-note" style="margin-top:10px;display:none" role="alert"></div></div></div>
+<div id="bottomNav" role="navigation" aria-label="Main"><button data-act="navTo('explore')">Explore</button><button data-act="navTo('creators')">Creators</button><button data-act="navTo('request')">Request</button><button data-act="navTo('mydrops')">Activity</button><button data-act="navTo('settings')">Account</button></div>
+<footer class="site-foot">DropLive pilot · <a href="#" data-act="openLegal();return false">Terms &amp; Privacy</a><span id="footContact"></span></footer>
+<div id="toast" role="status" aria-live="polite"></div>
+<button class="dc-cta" id="stickyCta" data-act="pledge()">CONTRIBUTE</button>
+</body></html>

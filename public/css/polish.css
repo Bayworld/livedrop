@@ -1,0 +1,22 @@
+/* v0.9.0 polish layer: loaded after styles.css. Visual refinements only; no layout changes. */
+::selection{background:rgba(201,168,76,.28);color:#fff}
+body{-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;text-rendering:optimizeLegibility}
+nav{transition:background .25s,border-color .25s}
+.tab,.dc-cta,button{transition:background .18s ease,color .18s ease,border-color .18s ease,transform .12s ease,box-shadow .18s ease}
+.dc-cta:hover{box-shadow:0 6px 24px -8px rgba(201,168,76,.55);transform:translateY(-1px)}
+.dc-cta:active,.tab:active{transform:translateY(0) scale(.98)}
+.market-card{transition:transform .22s cubic-bezier(.2,.7,.2,1),border-color .22s,box-shadow .22s}
+@media (hover:hover){.market-card:hover{transform:translateY(-3px);border-color:rgba(201,168,76,.45);box-shadow:0 18px 40px -22px rgba(0,0,0,.9)}}
+.market-progress>div{transition:width .8s cubic-bezier(.2,.7,.2,1)}
+/* skeleton loading placeholder: add class="skel" to any block */
+.skel{position:relative;overflow:hidden;background:var(--s2);border-radius:var(--r);min-height:14px}
+.skel::after{content:"";position:absolute;inset:0;transform:translateX(-100%);background:linear-gradient(90deg,transparent,rgba(255,255,255,.06),transparent);animation:skel 1.4s infinite}
+@keyframes skel{to{transform:translateX(100%)}}
+/* page content fade-in when a panel opens */
+.pn.on,.pn.active{animation:pnIn .28s ease both}
+@keyframes pnIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+/* thin gold scrollbar */
+*{scrollbar-width:thin;scrollbar-color:var(--s4) transparent}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
+
+.explore-tools{display:flex;gap:10px;margin:0 0 14px}.explore-tools input{flex:1;min-width:0}.explore-tools select{width:auto;min-width:150px}@media(max-width:560px){.explore-tools{flex-direction:column}.explore-tools select{width:100%}}

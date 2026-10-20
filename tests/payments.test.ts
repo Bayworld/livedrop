@@ -1,0 +1,22 @@
+// Run: node --experimental-strip-types tests/payments.test.ts
+import { createHmac } from "node:crypto";
+import { validSignature, chargeMatches, toKobo, safeEqual } from "../supabase/functions/_shared/verify.ts";
+let fails = 0;
+const check = (n: string, c: boolean) => { console.log((c ? "PASS " : "FAIL ") + n); if (!c) fails++; };
+const secret = "sk_test_example", body = '{"event":"charge.success","data":{"id":1,"reference":"dl_abc"}}';
+const good = createHmac("sha512", secret).update(body).digest("hex");
+check("valid signature accepted", await validSignature(secret, body, good));
+check("uppercase hex accepted", await validSignature(secret, body, good.toUpperCase()));
+check("tampered body rejected", !(await validSignature(secret, body + " ", good)));
+check("wrong secret rejected", !(await validSignature("sk_test_other", body, good)));
+check("missing header rejected", !(await validSignature(secret, body, null)));
+check("empty secret rejected", !(await validSignature("", body, good)));
+check("safeEqual length mismatch", !safeEqual("abc", "abcd"));
+check("toKobo 5000 NGN", toKobo(5000) === 500000);
+const tx = { status: "success", amount: 500000, currency: "NGN", reference: "dl_abc" };
+check("exact charge matches", chargeMatches(tx, { reference: "dl_abc", amountNaira: 5000 }));
+check("underpayment rejected", !chargeMatches({ ...tx, amount: 100 }, { reference: "dl_abc", amountNaira: 5000 }));
+check("wrong currency rejected", !chargeMatches({ ...tx, currency: "USD" }, { reference: "dl_abc", amountNaira: 5000 }));
+check("failed status rejected", !chargeMatches({ ...tx, status: "failed" }, { reference: "dl_abc", amountNaira: 5000 }));
+check("reference swap rejected", !chargeMatches({ ...tx, reference: "dl_zzz" }, { reference: "dl_abc", amountNaira: 5000 }));
+process.exit(fails ? 1 : 0);

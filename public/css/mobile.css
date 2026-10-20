@@ -1,0 +1,19 @@
+/* v0.11.1 mobile layer: loaded last. Targets TOUCH devices (pointer:coarse), not just narrow widths,
+   so tablets and phones held sideways get the same fixes. */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+body{overflow-x:hidden;padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right)}
+button,a,.tab,.filter-chip,label,input,select,textarea{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+@media (pointer:coarse){
+  /* iOS Safari zooms the whole page when a focused field is under 16px */
+  input,select,textarea,.form-input{font-size:16px!important}
+  /* comfortable thumb targets */
+  .tab,.filter-chip,.dc-cta,button{min-height:44px}
+  .tab{display:inline-flex;align-items:center}
+  input[type=checkbox],input[type=radio]{width:20px;height:20px}
+}
+/* Pop-ups must always fit the visible screen (dvh = excludes browser bars/keyboard) and scroll inside themselves */
+#authModal,#accountModal,#notifModal,#legalModal{overscroll-behavior:contain;overflow-y:auto;-webkit-overflow-scrolling:touch}
+#authModal>div,#accountModal>div,#notifModal>div,#legalModal>div{max-height:calc(100dvh - 32px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+@supports not (height:100dvh){#authModal>div,#accountModal>div,#notifModal>div,#legalModal>div{max-height:calc(100vh - 32px)}}
+@media (max-height:500px){#authModal,#accountModal,#legalModal{align-items:flex-start!important;padding:10px!important}}
+img,video,canvas,svg{max-width:100%}

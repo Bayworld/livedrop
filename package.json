@@ -1,0 +1,11 @@
+{
+  "name": "droplive",
+  "version": "0.16.1",
+  "private": true,
+  "description": "Fan-funded live sessions with creators.",
+  "scripts": {
+    "build": "node scripts/build-config.mjs",
+    "test:payments": "node --experimental-strip-types tests/payments.test.ts"
+  },
+  "engines": { "node": ">=20" }
+}
